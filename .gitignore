@@ -20,3 +20,9 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Demo artifacts (captured frames, intermediate files)
+obsidian-tests/demo-artifacts/
+
+# wdio-obsidian-service cache (downloaded Obsidian binaries)
+.obsidian-cache/

@@ -6,6 +6,12 @@
 - Entry point: `main.ts` compiled to `main.js` and loaded by Obsidian.
 - Required release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
 
+## Localized docs & `agents/` (keep in sync)
+
+- **README.md** (English) and **README.ru.md** (Russian) are a pair: same structure and technical facts; translate prose only. Cross-links at the top mirror [obsidian-natural-link](https://github.com/rekby/obsidian-natural-link).
+- Demo assets: **`npm run demo`** rebuilds English + Russian README PNGs and demo GIFs (**docs/demo/**, **docs/demo/ru/**; vaults **obsidian-tests/demo-vault** and **obsidian-tests/demo-vault-ru**). **`npm run demo:screenshots`** refreshes both PNG sets; **`demo:screenshots:ru`** is Russian-only for quick runs. Keep both vaults and outputs aligned when the demo scenario changes.
+- Files under **agents/** must stay **consistent with each other and with this AGENTS.md**—no diverging “sources of truth.” See **agents/README.md** for the maintenance rule.
+
 ## Environment & tooling
 
 - Node.js: use current LTS (Node 18+ recommended).
