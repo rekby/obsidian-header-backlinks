@@ -1,4 +1,5 @@
 import { App, TFile, ReferenceCache } from "obsidian";
+import { buildReferencePreview, createFileTextIndex } from "./source-preview";
 import { HeaderBacklinksMap, HeaderBacklinkSource } from "./types";
 
 export function normalizeHeader(text: string): string {
@@ -9,6 +10,7 @@ export class BacklinkResolver {
 	private app: App;
 	private map: HeaderBacklinksMap = new Map();
 	private rebuildTimeout: ReturnType<typeof setTimeout> | null = null;
+	private rebuildSequence: Promise<void> = Promise.resolve();
 	private version = 0;
 	private onChanged: (() => void) | null = null;
 
@@ -27,7 +29,7 @@ export class BacklinkResolver {
 		return fileMap.get(normalizeHeader(headerText)) ?? [];
 	}
 
-	buildMap(): void {
+	async buildMap(): Promise<void> {
 		const newMap: HeaderBacklinksMap = new Map();
 		const files = this.app.vault.getMarkdownFiles();
 
@@ -39,6 +41,10 @@ export class BacklinkResolver {
 				...(cache.links ?? []),
 				...(cache.embeds ?? []),
 			];
+			if (refs.length === 0) continue;
+
+			const sourceText = await this.app.vault.cachedRead(file);
+			const textIndex = createFileTextIndex(sourceText);
 
 			for (const ref of refs) {
 				const hashIndex = ref.link.indexOf("#");
@@ -74,6 +80,8 @@ export class BacklinkResolver {
 					sourceFilePath: file.path,
 					sourceFileName: file.basename,
 					lineNumber: ref.position.start.line,
+					columnNumber: ref.position.start.col,
+					previewText: buildReferencePreview(textIndex, ref),
 				});
 			}
 		}
@@ -85,7 +93,18 @@ export class BacklinkResolver {
 		for (const fileMap of newMap.values()) {
 			totalHeaders += fileMap.size;
 		}
-		console.log(`[HandleHeaderLink] Built backlinks map: ${newMap.size} files, ${totalHeaders} headers, version=${this.version}`);
+		console.debug(`[HandleHeaderLink] Built backlinks map: ${newMap.size} files, ${totalHeaders} headers, version=${this.version}`);
+	}
+
+	rebuildNow(): Promise<void> {
+		this.rebuildSequence = this.rebuildSequence
+			.catch(() => undefined)
+			.then(async () => {
+				await this.buildMap();
+				this.onChanged?.();
+			});
+
+		return this.rebuildSequence;
 	}
 
 	scheduleBuild(): void {
@@ -94,8 +113,7 @@ export class BacklinkResolver {
 		}
 		this.rebuildTimeout = setTimeout(() => {
 			this.rebuildTimeout = null;
-			this.buildMap();
-			this.onChanged?.();
+			void this.rebuildNow();
 		}, 150);
 	}
 

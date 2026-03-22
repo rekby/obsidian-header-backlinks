@@ -14,8 +14,7 @@ export default class HandleHeaderLinkPlugin extends Plugin {
 		this.registerEditorExtension(createEditorExtension(this.resolver));
 
 		this.app.workspace.onLayoutReady(() => {
-			this.resolver.buildMap();
-			this.notifyEditors();
+			void this.resolver.rebuildNow();
 		});
 
 		this.registerEvent(

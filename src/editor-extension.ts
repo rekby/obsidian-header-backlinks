@@ -1,6 +1,5 @@
 import { App, editorInfoField, Menu, setIcon } from "obsidian";
 import {
-	EditorView,
 	GutterMarker,
 	ViewUpdate,
 	gutter,
@@ -8,6 +7,7 @@ import {
 import { StateEffect, StateField } from "@codemirror/state";
 import { BacklinkResolver } from "./backlink-resolver";
 import { HeaderBacklinkSource } from "./types";
+import { BacklinkOccurrencesModal, openBacklinkSource } from "./source-navigation";
 
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*$/;
 
@@ -55,15 +55,23 @@ class AnchorGutterMarker extends GutterMarker {
 			evt.preventDefault();
 			evt.stopPropagation();
 			const menu = new Menu();
-			for (const source of this.sources) {
+			for (const group of groupSourcesByFile(this.sources)) {
 				menu.addItem((item) => {
-					item.setTitle(source.sourceFileName);
+					item.setTitle(group.title);
 					item.onClick(() => {
-						this.app.workspace.openLinkText(
-							source.sourceFilePath,
-							"",
-							false,
-						);
+						if (group.sources.length === 1) {
+							void openBacklinkSource(this.app, group.sources[0]!);
+							return;
+						}
+
+						new BacklinkOccurrencesModal(
+							this.app,
+							group.fileName,
+							group.sources,
+							(source) => {
+								void openBacklinkSource(this.app, source);
+							},
+						).open();
 					});
 				});
 			}
@@ -76,6 +84,39 @@ class AnchorGutterMarker extends GutterMarker {
 
 function stripTrailingHashes(text: string): string {
 	return text.replace(/\s+#+\s*$/, "");
+}
+
+function groupSourcesByFile(sources: HeaderBacklinkSource[]): Array<{
+	fileName: string;
+	sources: HeaderBacklinkSource[];
+	title: string;
+}> {
+	const groups = new Map<string, HeaderBacklinkSource[]>();
+
+	for (const source of sources) {
+		const existing = groups.get(source.sourceFilePath);
+		if (existing) {
+			existing.push(source);
+		} else {
+			groups.set(source.sourceFilePath, [source]);
+		}
+	}
+
+	return Array.from(groups.entries())
+		.map(([, fileSources]) => {
+			const sortedSources = [...fileSources].sort((a, b) => {
+				if (a.lineNumber !== b.lineNumber) return a.lineNumber - b.lineNumber;
+				return a.columnNumber - b.columnNumber;
+			});
+			const fileName = sortedSources[0]?.sourceFileName ?? "";
+
+			return {
+				fileName,
+				sources: sortedSources,
+				title: sortedSources.length > 1 ? `${fileName} >` : fileName,
+			};
+		})
+		.sort((a, b) => a.fileName.localeCompare(b.fileName));
 }
 
 export function createEditorExtension(resolver: BacklinkResolver) {
