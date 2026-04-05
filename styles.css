@@ -1,27 +1,23 @@
 .header-backlink-anchor-wrapper {
 	display: inline-block;
 	width: 0;
+	height: 0;
 	overflow: visible;
-	vertical-align: middle;
+	vertical-align: baseline;
+	position: relative;
 }
 
 .header-backlink-anchor {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
+	position: absolute;
+	bottom: 0;
+	right: 0.5em;
+	display: flex;
 	cursor: pointer;
-	color: #000;
-	position: relative;
-	right: 30px;
-	width: 14px;
-}
-
-.theme-dark .header-backlink-anchor {
-	color: #fff;
+	color: var(--text-muted);
 }
 
 .header-backlink-anchor svg {
-	width: 12px;
-	height: 12px;
+	width: 0.7em;
+	height: 0.7em;
 	stroke-width: 2px;
 }
