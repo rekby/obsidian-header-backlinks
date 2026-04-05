@@ -1,21 +1,24 @@
 import { App, TFile, ReferenceCache } from "obsidian";
-import { buildReferencePreview, createFileTextIndex } from "./source-preview";
+import { buildReferencePreview, createFileTextIndex, FileTextIndex } from "./source-preview";
 import { HeaderBacklinksMap, HeaderBacklinkSource } from "./types";
+
+const DEBOUNCE_MS = 150;
 
 export function normalizeHeader(text: string): string {
 	return text.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 export class BacklinkResolver {
-	private app: App;
 	private map: HeaderBacklinksMap = new Map();
 	private rebuildTimeout: ReturnType<typeof setTimeout> | null = null;
 	private rebuildSequence: Promise<void> = Promise.resolve();
 	private version = 0;
 	private onChanged: (() => void) | null = null;
 
-	constructor(app: App, onChanged: () => void) {
-		this.app = app;
+	constructor(
+		private readonly app: App,
+		onChanged: () => void,
+	) {
 		this.onChanged = onChanged;
 	}
 
@@ -24,16 +27,13 @@ export class BacklinkResolver {
 	}
 
 	getBacklinksForHeader(filePath: string, headerText: string): HeaderBacklinkSource[] {
-		const fileMap = this.map.get(filePath);
-		if (!fileMap) return [];
-		return fileMap.get(normalizeHeader(headerText)) ?? [];
+		return this.map.get(filePath)?.get(normalizeHeader(headerText)) ?? [];
 	}
 
 	async buildMap(): Promise<void> {
 		const newMap: HeaderBacklinksMap = new Map();
-		const files = this.app.vault.getMarkdownFiles();
 
-		for (const file of files) {
+		for (const file of this.app.vault.getMarkdownFiles()) {
 			const cache = this.app.metadataCache.getFileCache(file);
 			if (!cache) continue;
 
@@ -47,53 +47,13 @@ export class BacklinkResolver {
 			const textIndex = createFileTextIndex(sourceText);
 
 			for (const ref of refs) {
-				const hashIndex = ref.link.indexOf("#");
-				if (hashIndex === -1) continue;
-
-				const linkpath = ref.link.substring(0, hashIndex);
-				const headerFragment = ref.link.substring(hashIndex + 1);
-				if (!headerFragment) continue;
-
-				let targetFile: TFile | null;
-				if (linkpath === "") {
-					targetFile = file;
-				} else {
-					targetFile = this.app.metadataCache.getFirstLinkpathDest(linkpath, file.path);
-				}
-				if (!targetFile) continue;
-
-				const normalizedHeader = normalizeHeader(headerFragment);
-
-				let fileMap = newMap.get(targetFile.path);
-				if (!fileMap) {
-					fileMap = new Map();
-					newMap.set(targetFile.path, fileMap);
-				}
-
-				let sources = fileMap.get(normalizedHeader);
-				if (!sources) {
-					sources = [];
-					fileMap.set(normalizedHeader, sources);
-				}
-
-				sources.push({
-					sourceFilePath: file.path,
-					sourceFileName: file.basename,
-					lineNumber: ref.position.start.line,
-					columnNumber: ref.position.start.col,
-					previewText: buildReferencePreview(textIndex, ref),
-				});
+				this.processReference(newMap, file, textIndex, ref);
 			}
 		}
 
 		this.map = newMap;
 		this.version++;
-
-		let totalHeaders = 0;
-		for (const fileMap of newMap.values()) {
-			totalHeaders += fileMap.size;
-		}
-		console.debug(`[HandleHeaderLink] Built backlinks map: ${newMap.size} files, ${totalHeaders} headers, version=${this.version}`);
+		this.logMapStats(newMap);
 	}
 
 	rebuildNow(): Promise<void> {
@@ -114,7 +74,7 @@ export class BacklinkResolver {
 		this.rebuildTimeout = setTimeout(() => {
 			this.rebuildTimeout = null;
 			void this.rebuildNow();
-		}, 150);
+		}, DEBOUNCE_MS);
 	}
 
 	destroy(): void {
@@ -124,4 +84,57 @@ export class BacklinkResolver {
 		}
 		this.onChanged = null;
 	}
+
+	private processReference(
+		map: HeaderBacklinksMap,
+		sourceFile: TFile,
+		textIndex: FileTextIndex,
+		ref: ReferenceCache,
+	): void {
+		const hashIndex = ref.link.indexOf("#");
+		if (hashIndex === -1) return;
+
+		const linkpath = ref.link.substring(0, hashIndex);
+		const headerFragment = ref.link.substring(hashIndex + 1);
+		if (!headerFragment) return;
+
+		const targetFile = linkpath === ""
+			? sourceFile
+			: this.app.metadataCache.getFirstLinkpathDest(linkpath, sourceFile.path);
+		if (!targetFile) return;
+
+		const fileMap = getOrCreate(
+			map, targetFile.path, () => new Map<string, HeaderBacklinkSource[]>(),
+		);
+		const sources = getOrCreate(
+			fileMap, normalizeHeader(headerFragment), () => [] as HeaderBacklinkSource[],
+		);
+
+		sources.push({
+			sourceFilePath: sourceFile.path,
+			sourceFileName: sourceFile.basename,
+			lineNumber: ref.position.start.line,
+			columnNumber: ref.position.start.col,
+			previewText: buildReferencePreview(textIndex, ref),
+		});
+	}
+
+	private logMapStats(map: HeaderBacklinksMap): void {
+		let totalHeaders = 0;
+		for (const fileMap of map.values()) {
+			totalHeaders += fileMap.size;
+		}
+		console.debug(
+			`[HandleHeaderLink] Built backlinks map: ${map.size} files, ${totalHeaders} headers, version=${this.version}`,
+		);
+	}
+}
+
+function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+	let value = map.get(key);
+	if (value === undefined) {
+		value = create();
+		map.set(key, value);
+	}
+	return value;
 }

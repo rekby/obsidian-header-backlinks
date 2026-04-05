@@ -17,23 +17,10 @@ export default class HandleHeaderLinkPlugin extends Plugin {
 			void this.resolver.rebuildNow();
 		});
 
-		this.registerEvent(
-			this.app.metadataCache.on("changed", () => {
-				this.resolver.scheduleBuild();
-			}),
-		);
-
-		this.registerEvent(
-			this.app.metadataCache.on("deleted", () => {
-				this.resolver.scheduleBuild();
-			}),
-		);
-
-		this.registerEvent(
-			this.app.metadataCache.on("resolved", () => {
-				this.resolver.scheduleBuild();
-			}),
-		);
+		const scheduleBuild = () => this.resolver.scheduleBuild();
+		this.registerEvent(this.app.metadataCache.on("changed", scheduleBuild));
+		this.registerEvent(this.app.metadataCache.on("deleted", scheduleBuild));
+		this.registerEvent(this.app.metadataCache.on("resolved", scheduleBuild));
 	}
 
 	onunload() {

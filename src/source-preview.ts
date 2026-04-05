@@ -4,7 +4,7 @@ const PREVIEW_WORDS_BEFORE = 6;
 const PREVIEW_WORDS_AFTER = 6;
 const PREVIEW_MAX_LENGTH = 140;
 
-interface FileTextIndex {
+export interface FileTextIndex {
 	lines: string[];
 	lineStarts: number[];
 	text: string;
@@ -13,12 +13,15 @@ interface FileTextIndex {
 export function createFileTextIndex(text: string): FileTextIndex {
 	const lines = text.split(/\r?\n/);
 	const lineStarts: number[] = [];
-	const newlineMatches = text.match(/\r?\n/g) ?? [];
 	let offset = 0;
 
-	for (let i = 0; i < lines.length; i++) {
+	for (const line of lines) {
 		lineStarts.push(offset);
-		offset += (lines[i]?.length ?? 0) + (newlineMatches[i]?.length ?? 0);
+		// Find the actual separator length at this position in the original text
+		offset += line.length;
+		if (offset < text.length) {
+			offset += text[offset] === "\r" ? 2 : 1;
+		}
 	}
 
 	return { lines, lineStarts, text };

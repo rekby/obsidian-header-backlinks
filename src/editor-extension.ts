@@ -13,6 +13,7 @@ import { HeaderBacklinkSource } from "./types";
 import { BacklinkOccurrencesModal, openBacklinkSource } from "./source-navigation";
 
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*$/;
+const RENAME_HEADING_CMD = "editor:rename-heading";
 
 export const backlinkVersionEffect = StateEffect.define<number>();
 
@@ -27,15 +28,12 @@ export const backlinkVersionField = StateField.define<number>({
 });
 
 class AnchorWidget extends WidgetType {
-	private sources: HeaderBacklinkSource[];
-	private app: App;
-	private headingLine: number;
-
-	constructor(sources: HeaderBacklinkSource[], app: App, headingLine: number) {
+	constructor(
+		private readonly sources: HeaderBacklinkSource[],
+		private readonly app: App,
+		private readonly headingLine: number,
+	) {
 		super();
-		this.sources = sources;
-		this.app = app;
-		this.headingLine = headingLine;
 	}
 
 	eq(other: AnchorWidget): boolean {
@@ -62,45 +60,7 @@ class AnchorWidget extends WidgetType {
 		el.addEventListener("click", (evt) => {
 			evt.preventDefault();
 			evt.stopPropagation();
-			const menu = new Menu();
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- commands API is not in Obsidian's public types
-			const renameCmd = (this.app as any).commands?.findCommand("editor:rename-heading") as { name?: string } | undefined;
-			if (renameCmd) {
-				menu.addItem((item) => {
-					item.setTitle(renameCmd.name ?? "Rename this heading...");
-					item.setIcon("pencil");
-					item.onClick(() => {
-						const editor = this.app.workspace.activeEditor?.editor;
-						if (editor) {
-							editor.setCursor({ line: this.headingLine, ch: 0 });
-							// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- executeCommandById is not in Obsidian's public types
-							(this.app as any).commands.executeCommandById("editor:rename-heading");
-						}
-					});
-				});
-				menu.addSeparator();
-			}
-			for (const group of groupSourcesByFile(this.sources)) {
-				menu.addItem((item) => {
-					item.setTitle(group.title);
-					item.onClick(() => {
-						if (group.sources.length === 1) {
-							void openBacklinkSource(this.app, group.sources[0]!);
-							return;
-						}
-
-						new BacklinkOccurrencesModal(
-							this.app,
-							group.fileName,
-							group.sources,
-							(source) => {
-								void openBacklinkSource(this.app, source);
-							},
-						).open();
-					});
-				});
-			}
-			menu.showAtMouseEvent(evt);
+			this.showContextMenu(evt);
 		});
 
 		wrapper.appendChild(el);
@@ -109,6 +69,55 @@ class AnchorWidget extends WidgetType {
 
 	ignoreEvent(): boolean {
 		return false;
+	}
+
+	private showContextMenu(evt: MouseEvent): void {
+		const menu = new Menu();
+		this.addRenameItem(menu);
+		this.addBacklinkItems(menu);
+		menu.showAtMouseEvent(evt);
+	}
+
+	private addRenameItem(menu: Menu): void {
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- commands API is not in Obsidian's public types
+		const renameCmd = (this.app as any).commands?.findCommand(RENAME_HEADING_CMD) as { name?: string } | undefined;
+		if (!renameCmd) return;
+
+		menu.addItem((item) => {
+			item.setTitle(renameCmd.name ?? "Rename this heading...");
+			item.setIcon("pencil");
+			item.onClick(() => {
+				const editor = this.app.workspace.activeEditor?.editor;
+				if (!editor) return;
+				editor.setCursor({ line: this.headingLine, ch: 0 });
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- executeCommandById is not in Obsidian's public types
+				(this.app as any).commands.executeCommandById(RENAME_HEADING_CMD);
+			});
+		});
+		menu.addSeparator();
+	}
+
+	private addBacklinkItems(menu: Menu): void {
+		for (const group of groupSourcesByFile(this.sources)) {
+			menu.addItem((item) => {
+				item.setTitle(group.title);
+				item.onClick(() => this.navigateToGroup(group));
+			});
+		}
+	}
+
+	private navigateToGroup(group: { fileName: string; sources: HeaderBacklinkSource[] }): void {
+		if (group.sources.length === 1) {
+			void openBacklinkSource(this.app, group.sources[0]!);
+			return;
+		}
+
+		new BacklinkOccurrencesModal(
+			this.app,
+			group.fileName,
+			group.sources,
+			(source) => void openBacklinkSource(this.app, source),
+		).open();
 	}
 }
 
@@ -183,8 +192,8 @@ function buildDecorations(view: EditorView, resolver: BacklinkResolver): Decorat
 }
 
 export function createEditorExtension(resolver: BacklinkResolver) {
-	const plugin = ViewPlugin.fromClass(
-		class {
+	const decorationPlugin = ViewPlugin.fromClass(
+		class BacklinkDecorationPlugin {
 			decorations: DecorationSet;
 
 			constructor(view: EditorView) {
@@ -192,12 +201,11 @@ export function createEditorExtension(resolver: BacklinkResolver) {
 			}
 
 			update(update: ViewUpdate) {
-				if (
-					update.docChanged ||
-					update.viewportChanged ||
+				const versionChanged =
 					update.startState.field(backlinkVersionField) !==
-						update.state.field(backlinkVersionField)
-				) {
+					update.state.field(backlinkVersionField);
+
+				if (update.docChanged || update.viewportChanged || versionChanged) {
 					this.decorations = buildDecorations(update.view, resolver);
 				}
 			}
@@ -205,5 +213,5 @@ export function createEditorExtension(resolver: BacklinkResolver) {
 		{ decorations: (v) => v.decorations },
 	);
 
-	return [backlinkVersionField, plugin];
+	return [backlinkVersionField, decorationPlugin];
 }
