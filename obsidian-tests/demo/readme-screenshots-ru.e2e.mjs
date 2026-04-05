@@ -34,6 +34,7 @@ describe("Handle Header Link README screenshots (Russian)", function () {
 		await prepareDemoScenario({
 			vault: VAULT,
 			startFile: "Дорожная карта проекта.md",
+			locale: "ru",
 		});
 
 		await browser.pause(800);
@@ -44,6 +45,7 @@ describe("Handle Header Link README screenshots (Russian)", function () {
 		await prepareDemoScenario({
 			vault: VAULT,
 			startFile: "Дорожная карта проекта.md",
+			locale: "ru",
 		});
 
 		await openBacklinkMenuForDemo("Цели Q1", "ru");

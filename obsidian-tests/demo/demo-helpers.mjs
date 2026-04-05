@@ -172,7 +172,7 @@ export async function waitForBacklinksReady() {
 	);
 }
 
-export async function prepareDemoScenario({ vault, startFile }) {
+export async function prepareDemoScenario({ vault, startFile, locale = "en" }) {
 	await browser.keys("Escape");
 	const modalContainer = await $(".modal-container");
 	if (await modalContainer.isDisplayed().catch(() => false)) {
@@ -241,12 +241,27 @@ export async function prepareDemoScenario({ vault, startFile }) {
 	}
 
 	await waitForPlugin();
-	await configureDemoEnvironment();
+	await configureDemoEnvironment(locale);
 	await obsidianPage.openFile(startFile);
 	await waitForBacklinksReady();
 }
 
-export async function configureDemoEnvironment() {
+export async function configureDemoEnvironment(locale = "en") {
+	const needsReload = await browser.execute((lang) => {
+		const current = window.localStorage.getItem("language");
+		if (current === lang) return false;
+		window.localStorage.setItem("language", lang);
+		return true;
+	}, locale);
+
+	if (needsReload) {
+		await browser.executeObsidian(({ app }) => {
+			app.commands.executeCommandById("app:reload");
+		});
+		await browser.pause(2000);
+		await waitForPlugin();
+	}
+
 	await browser.execute(() => {
 		const styleId = "handle-header-link-demo-style";
 		document.getElementById(styleId)?.remove();
@@ -307,6 +322,15 @@ export async function openBacklinkMenuForDemo(headerLabel, locale = "en") {
 				// Desktop: default is often a native menu — it never appears in `document`, so screenshots/WebDriver see nothing.
 				if (typeof menu.setUseNativeMenu === "function") {
 					menu.setUseNativeMenu(false);
+				}
+				const renameCmd = app.commands?.findCommand?.("editor:rename-heading");
+				if (renameCmd) {
+					menu.addItem((item) => {
+						item.setTitle(renameCmd.name ?? "Rename this heading...");
+						item.setIcon("pencil");
+						item.onClick(() => {});
+					});
+					menu.addSeparator();
 				}
 				for (const s of items) {
 					menu.addItem((item) => {

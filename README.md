@@ -9,6 +9,7 @@ An Obsidian plugin that shows an **anchor icon** in the editor gutter next to he
 - **Vault-wide header backlinks**: Scans markdown files for wiki-style links and embeds that include a `#` fragment pointing at a heading. Builds a map of “which headings are linked from where.”
 - **Gutter anchor icons**: In **Live Preview** and **Source** mode, referenced headings get a small anchor in the left gutter (next to the line number column). Headings with no incoming header links show no icon.
 - **Quick navigation**: Click an anchor to open a context menu listing every source note. Choosing an entry jumps to the exact link line, and notes with multiple matches open a second chooser with `line: quote` entries.
+- **Rename heading**: The context menu includes a **Rename this heading…** action (uses the built-in Obsidian command) that renames the heading and updates all links pointing to it.
 - **Same-file links**: Supports `[[#Heading]]` / `[[#Some heading]]` style links where the target is a heading in the **same** note.
 - **Embeds included**: References from `![[Note#Heading]]` style embeds are counted the same as ordinary `[[...]]` links.
 - **Stays up to date**: When metadata changes (edits, new files, resolved links), the backlink map is rebuilt on a short debounce so the gutter stays in sync with the vault.

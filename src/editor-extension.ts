@@ -63,19 +63,23 @@ class AnchorWidget extends WidgetType {
 			evt.preventDefault();
 			evt.stopPropagation();
 			const menu = new Menu();
-			menu.addItem((item) => {
-				item.setTitle("Rename this heading...");
-				item.setIcon("pencil");
-				item.onClick(() => {
-					const editor = this.app.workspace.activeEditor?.editor;
-					if (editor) {
-						editor.setCursor({ line: this.headingLine, ch: 0 });
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- executeCommandById is not in Obsidian's public types
-						(this.app as any).commands.executeCommandById("editor:rename-heading");
-					}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- commands API is not in Obsidian's public types
+			const renameCmd = (this.app as any).commands?.findCommand("editor:rename-heading") as { name?: string } | undefined;
+			if (renameCmd) {
+				menu.addItem((item) => {
+					item.setTitle(renameCmd.name ?? "Rename this heading...");
+					item.setIcon("pencil");
+					item.onClick(() => {
+						const editor = this.app.workspace.activeEditor?.editor;
+						if (editor) {
+							editor.setCursor({ line: this.headingLine, ch: 0 });
+							// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- executeCommandById is not in Obsidian's public types
+							(this.app as any).commands.executeCommandById("editor:rename-heading");
+						}
+					});
 				});
-			});
-			menu.addSeparator();
+				menu.addSeparator();
+			}
 			for (const group of groupSourcesByFile(this.sources)) {
 				menu.addItem((item) => {
 					item.setTitle(group.title);

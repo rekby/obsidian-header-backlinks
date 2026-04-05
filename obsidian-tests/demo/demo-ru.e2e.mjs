@@ -39,6 +39,7 @@ describe("Handle Header Link demo capture (Russian)", function () {
 		await prepareDemoScenario({
 			vault: VAULT,
 			startFile: "Дорожная карта проекта.md",
+			locale: "ru",
 		});
 
 		await recorder.captureAndPause(HUMAN_PAUSE_MS);
@@ -66,6 +67,7 @@ describe("Handle Header Link demo capture (Russian)", function () {
 		await prepareDemoScenario({
 			vault: VAULT,
 			startFile: "Дорожная карта проекта.md",
+			locale: "ru",
 		});
 
 		await recorder.captureAndPause(1000);
