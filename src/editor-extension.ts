@@ -93,11 +93,11 @@ class AnchorWidget extends WidgetType {
 	}
 }
 
-function stripTrailingHashes(text: string): string {
+export function stripTrailingHashes(text: string): string {
 	return text.replace(/\s+#+\s*$/, "");
 }
 
-function groupSourcesByFile(sources: HeaderBacklinkSource[]): Array<{
+export function groupSourcesByFile(sources: HeaderBacklinkSource[]): Array<{
 	fileName: string;
 	sources: HeaderBacklinkSource[];
 	title: string;
