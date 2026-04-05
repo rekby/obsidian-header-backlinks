@@ -150,6 +150,16 @@ Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particula
 - Don't assume desktop-only behavior unless `isDesktopOnly` is `true`.
 - Avoid large in-memory structures; be mindful of memory and storage constraints.
 
+## Verification after changes
+
+After completing any code changes, always run the full verification pipeline:
+
+```bash
+npm test && npm run lint && npm run build
+```
+
+All three commands must pass before considering the task done.
+
 ## Agent do/don't
 
 **Do**
