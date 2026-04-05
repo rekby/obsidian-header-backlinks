@@ -1,10 +1,13 @@
 import { App, editorInfoField, Menu, setIcon } from "obsidian";
 import {
-	GutterMarker,
+	Decoration,
+	DecorationSet,
+	EditorView,
+	ViewPlugin,
 	ViewUpdate,
-	gutter,
+	WidgetType,
 } from "@codemirror/view";
-import { StateEffect, StateField } from "@codemirror/state";
+import { RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { BacklinkResolver } from "./backlink-resolver";
 import { HeaderBacklinkSource } from "./types";
 import { BacklinkOccurrencesModal, openBacklinkSource } from "./source-navigation";
@@ -23,7 +26,7 @@ export const backlinkVersionField = StateField.define<number>({
 	},
 });
 
-class AnchorGutterMarker extends GutterMarker {
+class AnchorWidget extends WidgetType {
 	private sources: HeaderBacklinkSource[];
 	private app: App;
 
@@ -33,7 +36,7 @@ class AnchorGutterMarker extends GutterMarker {
 		this.app = app;
 	}
 
-	eq(other: AnchorGutterMarker): boolean {
+	eq(other: AnchorWidget): boolean {
 		if (this.sources.length !== other.sources.length) return false;
 		for (let i = 0; i < this.sources.length; i++) {
 			const a = this.sources[i]!;
@@ -46,6 +49,9 @@ class AnchorGutterMarker extends GutterMarker {
 	}
 
 	toDOM(): HTMLElement {
+		const wrapper = document.createElement("span");
+		wrapper.className = "header-backlink-anchor-wrapper";
+
 		const el = document.createElement("span");
 		el.className = "header-backlink-anchor";
 		el.setAttribute("aria-label", `${this.sources.length} backlink(s)`);
@@ -78,7 +84,12 @@ class AnchorGutterMarker extends GutterMarker {
 			menu.showAtMouseEvent(evt);
 		});
 
-		return el;
+		wrapper.appendChild(el);
+		return wrapper;
+	}
+
+	ignoreEvent(): boolean {
+		return false;
 	}
 }
 
@@ -119,32 +130,61 @@ function groupSourcesByFile(sources: HeaderBacklinkSource[]): Array<{
 		.sort((a, b) => a.fileName.localeCompare(b.fileName));
 }
 
+function buildDecorations(view: EditorView, resolver: BacklinkResolver): DecorationSet {
+	const info = view.state.field(editorInfoField);
+	const file = info?.file;
+	if (!file) return Decoration.none;
+
+	const builder = new RangeSetBuilder<Decoration>();
+
+	for (const { from, to } of view.visibleRanges) {
+		let pos = from;
+		while (pos <= to) {
+			const line = view.state.doc.lineAt(pos);
+			const match = line.text.match(HEADING_RE);
+			if (match) {
+				const rawHeading = stripTrailingHashes(match[2]!);
+				const sources = resolver.getBacklinksForHeader(file.path, rawHeading);
+				if (sources.length > 0) {
+					builder.add(
+						line.from,
+						line.from,
+						Decoration.widget({
+							widget: new AnchorWidget(sources, info.app),
+							side: -1,
+						}),
+					);
+				}
+			}
+			pos = line.to + 1;
+		}
+	}
+
+	return builder.finish();
+}
+
 export function createEditorExtension(resolver: BacklinkResolver) {
-	const anchorGutter = gutter({
-		class: "cm-header-backlink-gutter",
-		lineMarker(view, line) {
-			const info = view.state.field(editorInfoField);
-			const file = info?.file;
-			if (!file) return null;
+	const plugin = ViewPlugin.fromClass(
+		class {
+			decorations: DecorationSet;
 
-			const docLine = view.state.doc.lineAt(line.from);
-			const match = docLine.text.match(HEADING_RE);
-			if (!match) return null;
+			constructor(view: EditorView) {
+				this.decorations = buildDecorations(view, resolver);
+			}
 
-			const rawHeading = stripTrailingHashes(match[2]!);
-			const sources = resolver.getBacklinksForHeader(file.path, rawHeading);
-			if (sources.length === 0) return null;
-
-			return new AnchorGutterMarker(sources, info.app);
+			update(update: ViewUpdate) {
+				if (
+					update.docChanged ||
+					update.viewportChanged ||
+					update.startState.field(backlinkVersionField) !==
+						update.state.field(backlinkVersionField)
+				) {
+					this.decorations = buildDecorations(update.view, resolver);
+				}
+			}
 		},
-		lineMarkerChange(update: ViewUpdate): boolean {
-			if (update.docChanged) return true;
-			return (
-				update.startState.field(backlinkVersionField) !==
-				update.state.field(backlinkVersionField)
-			);
-		},
-	});
+		{ decorations: (v) => v.decorations },
+	);
 
-	return [backlinkVersionField, anchorGutter];
+	return [backlinkVersionField, plugin];
 }

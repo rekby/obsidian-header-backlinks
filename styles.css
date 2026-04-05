@@ -1,21 +1,19 @@
-.cm-header-backlink-gutter {
-	width: 20px;
-	flex-shrink: 0;
-}
-
-.cm-header-backlink-gutter .cm-gutterElement {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 0;
+.header-backlink-anchor-wrapper {
+	display: inline-block;
+	width: 0;
+	overflow: visible;
+	vertical-align: middle;
 }
 
 .header-backlink-anchor {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
 	color: #000;
+	position: relative;
+	right: 20px;
+	width: 14px;
 }
 
 .theme-dark .header-backlink-anchor {
@@ -23,7 +21,7 @@
 }
 
 .header-backlink-anchor svg {
-	width: 18px;
-	height: 18px;
-	stroke-width: 2.5px;
+	width: 12px;
+	height: 12px;
+	stroke-width: 2px;
 }
