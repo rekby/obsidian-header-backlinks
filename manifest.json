@@ -1,7 +1,7 @@
 {
 	"id": "header-backlinks",
 	"name": "Obsidian Header Backlinks",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
 	"description": "Shows an anchor icon next to headers that are referenced by links, and lets you see which notes link to each header.",
 	"author": "rekby",
