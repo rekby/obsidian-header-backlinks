@@ -20,7 +20,7 @@ function screenshotPath(name) {
 	return path.resolve("docs/demo/ru", `${name}.png`);
 }
 
-describe("Handle Header Link README screenshots (Russian)", function () {
+describe("Header Backlinks README screenshots (Russian)", function () {
 	after(async () => {
 		await debugLog(
 			"readme-screenshots-ru.e2e.mjs:after",

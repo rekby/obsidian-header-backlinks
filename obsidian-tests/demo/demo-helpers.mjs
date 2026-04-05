@@ -34,7 +34,7 @@ export async function debugLog(location, message, data, hypothesisId, runId = "p
 }
 // #endregion
 
-export const PLUGIN_ID = "handle-header-link";
+export const PLUGIN_ID = "header-backlinks";
 export const DEMO_ARTIFACTS_ROOT = path.resolve("obsidian-tests/demo-artifacts");
 export const DEMO_OUTPUT_ROOT = path.resolve("docs/demo");
 /** Russian demo GIF output + frame staging (paired with `demo-vault-ru`). */
@@ -134,13 +134,13 @@ export async function waitForPlugin() {
 		async () =>
 			browser.executeObsidian(
 				({ app }) => {
-					const plugin = app.plugins?.plugins?.["handle-header-link"];
+					const plugin = app.plugins?.plugins?.["header-backlinks"];
 					return Boolean(plugin);
 				},
 			),
 		{
 			timeout: 30000,
-			timeoutMsg: "Handle Header Link plugin did not load in time",
+			timeoutMsg: "Header Backlinks plugin did not load in time",
 		},
 	);
 }
@@ -263,7 +263,7 @@ export async function configureDemoEnvironment(locale = "en") {
 	}
 
 	await browser.execute(() => {
-		const styleId = "handle-header-link-demo-style";
+		const styleId = "header-backlinks-demo-style";
 		document.getElementById(styleId)?.remove();
 
 		const style = document.createElement("style");
@@ -490,10 +490,10 @@ export async function clickMenuItem(text) {
 
 export async function captureKeyPress(recorder, label, durationMs = 650) {
 	await browser.execute((text) => {
-		let overlay = document.getElementById("handle-header-link-demo-key-overlay");
+		let overlay = document.getElementById("header-backlinks-demo-key-overlay");
 		if (!overlay) {
 			overlay = document.createElement("div");
-			overlay.id = "handle-header-link-demo-key-overlay";
+			overlay.id = "header-backlinks-demo-key-overlay";
 			overlay.style.cssText = `
 				position: fixed;
 				right: 28px;
@@ -514,7 +514,7 @@ export async function captureKeyPress(recorder, label, durationMs = 650) {
 	}, label);
 	await recorder.captureAndPause(durationMs);
 	await browser.execute(() => {
-		const overlay = document.getElementById("handle-header-link-demo-key-overlay");
+		const overlay = document.getElementById("header-backlinks-demo-key-overlay");
 		if (!overlay) return;
 		overlay.textContent = "";
 		overlay.style.display = "none";

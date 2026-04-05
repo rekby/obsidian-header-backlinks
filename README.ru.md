@@ -1,4 +1,4 @@
-# Handle Header Link
+# Header Backlinks
 
 _Read in English: [README.md](README.md)._
 
@@ -43,7 +43,7 @@ _Read in English: [README.md](README.md)._
 
 1. Откройте **Настройки → Сообщество плагинов**.
 2. При необходимости отключите **Ограниченный режим**, затем откройте **Обзор**.
-3. Найдите **Handle Header Link**.
+3. Найдите **Header Backlinks**.
 4. Нажмите **Установить**, затем **Включить**.
 
 ### Через BRAT
@@ -52,15 +52,15 @@ _Read in English: [README.md](README.md)._
 
 1. Установите плагин **BRAT** из Community Plugins.
 2. Откройте **Настройки → BRAT → Add Beta plugin**.
-3. Укажите URL репозитория: `https://github.com/rekby/obsidian-handle-header-link`
-4. Добавьте плагин и включите **Handle Header Link** в разделе Community plugins.
+3. Укажите URL репозитория: `https://github.com/rekby/obsidian-header-backlinks`
+4. Добавьте плагин и включите **Header Backlinks** в разделе Community plugins.
 
 ### Ручная установка
 
-1. Скачайте `main.js`, `manifest.json` и `styles.css` из [последнего релиза](https://github.com/rekby/obsidian-handle-header-link/releases).
-2. Создайте папку `<Хранилище>/.obsidian/plugins/handle-header-link/`.
+1. Скачайте `main.js`, `manifest.json` и `styles.css` из [последнего релиза](https://github.com/rekby/obsidian-header-backlinks/releases).
+2. Создайте папку `<Хранилище>/.obsidian/plugins/header-backlinks/`.
 3. Скопируйте туда эти три файла.
-4. Перезапустите Obsidian и включите **Handle Header Link** в **Настройки → Сообщество плагинов**.
+4. Перезапустите Obsidian и включите **Header Backlinks** в **Настройки → Сообщество плагинов**.
 
 ## Разработка
 

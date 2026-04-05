@@ -23,7 +23,7 @@ afterEach(async () => {
 	await dismissOpenUi();
 });
 
-describe("Handle Header Link demo capture (Russian)", function () {
+describe("Header Backlinks demo capture (Russian)", function () {
 	after(async () => {
 		await debugLog(
 			"demo-ru.e2e.mjs:after",

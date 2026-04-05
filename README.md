@@ -1,4 +1,4 @@
-# Handle Header Link
+# Header Backlinks
 
 _Читайте на русском: [README.ru.md](README.ru.md)._
 
@@ -43,7 +43,7 @@ Click an anchor to list every note that links to that heading, then jump to the 
 
 1. Open **Settings → Community plugins**.
 2. Turn off **Restricted mode** if needed, then open **Browse**.
-3. Search for **Handle Header Link**.
+3. Search for **Header Backlinks**.
 4. Click **Install**, then **Enable**.
 
 ### Via BRAT
@@ -52,15 +52,15 @@ If the plugin is not yet in the community list or you prefer installing from Git
 
 1. Install the **BRAT** plugin from Community Plugins.
 2. Open **Settings → BRAT → Add Beta plugin**.
-3. Enter this repository URL: `https://github.com/rekby/obsidian-handle-header-link`
-4. Add the plugin and enable **Handle Header Link** under Community plugins.
+3. Enter this repository URL: `https://github.com/rekby/obsidian-header-backlinks`
+4. Add the plugin and enable **Header Backlinks** under Community plugins.
 
 ### Manual installation
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/rekby/obsidian-handle-header-link/releases).
-2. Create the folder `<Vault>/.obsidian/plugins/handle-header-link/`.
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/rekby/obsidian-header-backlinks/releases).
+2. Create the folder `<Vault>/.obsidian/plugins/header-backlinks/`.
 3. Copy the three files into that folder.
-4. Reload Obsidian and enable **Handle Header Link** in **Settings → Community plugins**.
+4. Reload Obsidian and enable **Header Backlinks** in **Settings → Community plugins**.
 
 ## Development
 

@@ -20,7 +20,7 @@ function screenshotPath(name) {
 	return path.resolve("docs/demo", `${name}.png`);
 }
 
-describe("Handle Header Link README screenshots", function () {
+describe("Header Backlinks README screenshots", function () {
 	after(async () => {
 		await debugLog(
 			"readme-screenshots.e2e.mjs:after",

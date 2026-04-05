@@ -19,7 +19,7 @@ afterEach(async () => {
 	await dismissOpenUi();
 });
 
-describe("Handle Header Link demo capture", function () {
+describe("Header Backlinks demo capture", function () {
 	after(async () => {
 		await debugLog(
 			"demo.e2e.mjs:after",
