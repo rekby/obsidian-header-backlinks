@@ -24,6 +24,7 @@
 		"@codemirror/state": "^6.6.0",
 		"@codemirror/view": "^6.40.0",
 		"@eslint/js": "9.30.1",
+		"@eslint/json": "^1.2.0",
 		"@types/node": "^16.11.6",
 		"@wdio/cli": "^9.26.1",
 		"@wdio/globals": "^9.26.1",

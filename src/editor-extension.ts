@@ -29,11 +29,13 @@ export const backlinkVersionField = StateField.define<number>({
 class AnchorWidget extends WidgetType {
 	private sources: HeaderBacklinkSource[];
 	private app: App;
+	private headingLine: number;
 
-	constructor(sources: HeaderBacklinkSource[], app: App) {
+	constructor(sources: HeaderBacklinkSource[], app: App, headingLine: number) {
 		super();
 		this.sources = sources;
 		this.app = app;
+		this.headingLine = headingLine;
 	}
 
 	eq(other: AnchorWidget): boolean {
@@ -61,6 +63,19 @@ class AnchorWidget extends WidgetType {
 			evt.preventDefault();
 			evt.stopPropagation();
 			const menu = new Menu();
+			menu.addItem((item) => {
+				item.setTitle("Rename this heading...");
+				item.setIcon("pencil");
+				item.onClick(() => {
+					const editor = this.app.workspace.activeEditor?.editor;
+					if (editor) {
+						editor.setCursor({ line: this.headingLine, ch: 0 });
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- executeCommandById is not in Obsidian's public types
+						(this.app as any).commands.executeCommandById("editor:rename-heading");
+					}
+				});
+			});
+			menu.addSeparator();
 			for (const group of groupSourcesByFile(this.sources)) {
 				menu.addItem((item) => {
 					item.setTitle(group.title);
@@ -150,7 +165,7 @@ function buildDecorations(view: EditorView, resolver: BacklinkResolver): Decorat
 						line.from,
 						line.from,
 						Decoration.widget({
-							widget: new AnchorWidget(sources, info.app),
+							widget: new AnchorWidget(sources, info.app, line.number - 1),
 							side: -1,
 						}),
 					);

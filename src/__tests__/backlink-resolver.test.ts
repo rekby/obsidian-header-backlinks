@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { normalizeHeader, BacklinkResolver } from "../backlink-resolver";
+import type { App } from "obsidian";
+import { BacklinkResolver } from "../backlink-resolver";
 
 // Mock obsidian module
 vi.mock("obsidian", () => ({
@@ -60,7 +61,7 @@ function createMockApp(
 }
 
 describe("BacklinkResolver", () => {
-	let onChanged: ReturnType<typeof vi.fn>;
+	let onChanged: ReturnType<typeof vi.fn<() => void>>;
 
 	beforeEach(() => {
 		onChanged = vi.fn();
@@ -96,7 +97,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "My Header");
@@ -136,7 +137,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		// Should match even though case and spacing differ
@@ -167,7 +168,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("note.md", "Intro");
@@ -205,7 +206,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Section");
@@ -242,7 +243,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Title");
@@ -279,7 +280,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Title");
@@ -288,7 +289,7 @@ describe("BacklinkResolver", () => {
 
 	it("returns empty array for unknown file", () => {
 		const app = createMockApp([]);
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		expect(resolver.getBacklinksForHeader("nonexistent.md", "Header")).toEqual([]);
 	});
 
@@ -322,7 +323,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		expect(resolver.getBacklinksForHeader("target.md", "Nonexistent Header")).toEqual([]);
@@ -377,7 +378,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Header");
@@ -388,7 +389,7 @@ describe("BacklinkResolver", () => {
 
 	it("increments version on each build", async () => {
 		const app = createMockApp([]);
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		expect(resolver.getVersion()).toBe(0);
 
 		await resolver.buildMap();
@@ -421,7 +422,7 @@ describe("BacklinkResolver", () => {
 			},
 		]);
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 
 		// No target file exists, so no backlinks should be found
@@ -444,7 +445,7 @@ describe("BacklinkResolver", () => {
 			},
 		};
 
-		const resolver = new BacklinkResolver(app as any, onChanged);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		await resolver.buildMap();
 		// Should not throw and map should be empty
 		expect(resolver.getVersion()).toBe(1);
