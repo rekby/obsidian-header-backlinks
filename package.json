@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-header-backlinks",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Header Backlinks — Obsidian plugin that shows anchor icons next to headings referenced by links (https://obsidian.md)",
 	"main": "main.js",
 	"type": "module",
