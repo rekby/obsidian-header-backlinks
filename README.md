@@ -39,6 +39,8 @@ Click an anchor to list every note that links to that heading, then jump to the 
 
 ### From Obsidian Community Plugins
 
+> **Note:** This method will be available after the plugin is accepted into the Obsidian community plugin list. For now, use BRAT or manual installation below.
+
 1. Open **Settings → Community plugins**.
 2. Turn off **Restricted mode** if needed, then open **Browse**.
 3. Search for **Handle Header Link**.
