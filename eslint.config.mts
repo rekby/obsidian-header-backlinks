@@ -8,7 +8,13 @@ export default tseslint.config(
 		languageOptions: {
 			globals: {
 				...globals.browser,
+				...globals.node,
 			},
+		},
+	},
+	{
+		files: ["**/*.ts", "**/*.tsx"],
+		languageOptions: {
 			parserOptions: {
 				projectService: {
 					allowDefaultProject: [
@@ -21,15 +27,15 @@ export default tseslint.config(
 				extraFileExtensions: ['.json']
 			},
 		},
-	},
-	...tseslint.configs.strictTypeChecked,
-	...tseslint.configs.stylisticTypeChecked,
-	...obsidianmd.configs.recommended,
-	{
+		extends: [
+			...tseslint.configs.strictTypeChecked,
+			...tseslint.configs.stylisticTypeChecked,
+		],
 		rules: {
 			"@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
 		},
 	},
+	...obsidianmd.configs.recommended,
 	{
 		files: ["src/__tests__/**/*.ts"],
 		rules: {
