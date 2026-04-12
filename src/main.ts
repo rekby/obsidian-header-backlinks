@@ -6,7 +6,7 @@ import { backlinkVersionEffect, createEditorExtension } from "./editor-extension
 export default class HandleHeaderLinkPlugin extends Plugin {
 	private resolver!: BacklinkResolver;
 
-	async onload() {
+	onload() {
 		this.resolver = new BacklinkResolver(this.app, () => {
 			this.notifyEditors();
 		});
@@ -17,7 +17,7 @@ export default class HandleHeaderLinkPlugin extends Plugin {
 			void this.resolver.rebuildNow();
 		});
 
-		const scheduleBuild = () => this.resolver.scheduleBuild();
+		const scheduleBuild = () => { this.resolver.scheduleBuild(); };
 		this.registerEvent(this.app.metadataCache.on("changed", scheduleBuild));
 		this.registerEvent(this.app.metadataCache.on("deleted", scheduleBuild));
 		this.registerEvent(this.app.metadataCache.on("resolved", scheduleBuild));

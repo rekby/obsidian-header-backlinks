@@ -22,7 +22,23 @@ export default tseslint.config(
 			},
 		},
 	},
+	...tseslint.configs.strictTypeChecked,
+	...tseslint.configs.stylisticTypeChecked,
 	...obsidianmd.configs.recommended,
+	{
+		rules: {
+			"@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+		},
+	},
+	{
+		files: ["src/__tests__/**/*.ts"],
+		rules: {
+			"@typescript-eslint/no-extraneous-class": "off",
+			"@typescript-eslint/no-empty-function": "off",
+			"@typescript-eslint/no-non-null-assertion": "off",
+			"@typescript-eslint/array-type": "off",
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"dist",

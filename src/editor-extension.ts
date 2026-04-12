@@ -15,6 +15,19 @@ import { BacklinkOccurrencesModal, openBacklinkSource } from "./source-navigatio
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*$/;
 const RENAME_HEADING_CMD = "editor:rename-heading";
 
+interface ObsidianCommand {
+	name?: string;
+}
+
+interface ObsidianCommandsAPI {
+	findCommand(id: string): ObsidianCommand | undefined;
+	executeCommandById(id: string): void;
+}
+
+interface AppWithCommands {
+	commands?: ObsidianCommandsAPI;
+}
+
 export const backlinkVersionEffect = StateEffect.define<number>();
 
 export const backlinkVersionField = StateField.define<number>({
@@ -39,8 +52,9 @@ class AnchorWidget extends WidgetType {
 	eq(other: AnchorWidget): boolean {
 		if (this.sources.length !== other.sources.length) return false;
 		for (let i = 0; i < this.sources.length; i++) {
-			const a = this.sources[i]!;
-			const b = other.sources[i]!;
+			const a = this.sources[i];
+			const b = other.sources[i];
+			if (!a || !b) return false;
 			if (a.sourceFilePath !== b.sourceFilePath || a.lineNumber !== b.lineNumber) {
 				return false;
 			}
@@ -79,8 +93,8 @@ class AnchorWidget extends WidgetType {
 	}
 
 	private addRenameItem(menu: Menu): void {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- commands API is not in Obsidian's public types
-		const renameCmd = (this.app as any).commands?.findCommand(RENAME_HEADING_CMD) as { name?: string } | undefined;
+		const commands = (this.app as unknown as AppWithCommands).commands;
+		const renameCmd = commands?.findCommand(RENAME_HEADING_CMD);
 		if (!renameCmd) return;
 
 		menu.addItem((item) => {
@@ -90,8 +104,7 @@ class AnchorWidget extends WidgetType {
 				const editor = this.app.workspace.activeEditor?.editor;
 				if (!editor) return;
 				editor.setCursor({ line: this.headingLine, ch: 0 });
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any -- executeCommandById is not in Obsidian's public types
-				(this.app as any).commands.executeCommandById(RENAME_HEADING_CMD);
+				commands?.executeCommandById(RENAME_HEADING_CMD);
 			});
 		});
 		menu.addSeparator();
@@ -101,14 +114,15 @@ class AnchorWidget extends WidgetType {
 		for (const group of groupSourcesByFile(this.sources)) {
 			menu.addItem((item) => {
 				item.setTitle(group.title);
-				item.onClick(() => this.navigateToGroup(group));
+				item.onClick(() => { this.navigateToGroup(group); });
 			});
 		}
 	}
 
 	private navigateToGroup(group: { fileName: string; sources: HeaderBacklinkSource[] }): void {
-		if (group.sources.length === 1) {
-			void openBacklinkSource(this.app, group.sources[0]!);
+		const first = group.sources[0];
+		if (group.sources.length === 1 && first) {
+			void openBacklinkSource(this.app, first);
 			return;
 		}
 
@@ -116,7 +130,7 @@ class AnchorWidget extends WidgetType {
 			this.app,
 			group.fileName,
 			group.sources,
-			(source) => void openBacklinkSource(this.app, source),
+			(source) => { void openBacklinkSource(this.app, source); },
 		).open();
 	}
 }
@@ -125,11 +139,11 @@ export function stripTrailingHashes(text: string): string {
 	return text.replace(/\s+#+\s*$/, "");
 }
 
-export function groupSourcesByFile(sources: HeaderBacklinkSource[]): Array<{
+export function groupSourcesByFile(sources: HeaderBacklinkSource[]): {
 	fileName: string;
 	sources: HeaderBacklinkSource[];
 	title: string;
-}> {
+}[] {
 	const groups = new Map<string, HeaderBacklinkSource[]>();
 
 	for (const source of sources) {
@@ -160,7 +174,7 @@ export function groupSourcesByFile(sources: HeaderBacklinkSource[]): Array<{
 
 function buildDecorations(view: EditorView, resolver: BacklinkResolver): DecorationSet {
 	const info = view.state.field(editorInfoField);
-	const file = info?.file;
+	const file = info.file;
 	if (!file) return Decoration.none;
 
 	const builder = new RangeSetBuilder<Decoration>();
@@ -169,9 +183,10 @@ function buildDecorations(view: EditorView, resolver: BacklinkResolver): Decorat
 		let pos = from;
 		while (pos <= to) {
 			const line = view.state.doc.lineAt(pos);
-			const match = line.text.match(HEADING_RE);
-			if (match) {
-				const rawHeading = stripTrailingHashes(match[2]!);
+			const match = HEADING_RE.exec(line.text);
+			const headingText = match?.[2];
+			if (headingText !== undefined) {
+				const rawHeading = stripTrailingHashes(headingText);
 				const sources = resolver.getBacklinksForHeader(file.path, rawHeading);
 				if (sources.length > 0) {
 					builder.add(
