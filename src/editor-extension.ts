@@ -45,6 +45,7 @@ class AnchorWidget extends WidgetType {
 		private readonly sources: HeaderBacklinkSource[],
 		private readonly app: App,
 		private readonly headingLine: number,
+		private readonly resolver: BacklinkResolver,
 	) {
 		super();
 	}
@@ -131,6 +132,7 @@ class AnchorWidget extends WidgetType {
 			group.fileName,
 			group.sources,
 			(source) => { void openBacklinkSource(this.app, source); },
+			(sources) => this.resolver.loadPreviews(sources),
 		).open();
 	}
 }
@@ -193,7 +195,7 @@ function buildDecorations(view: EditorView, resolver: BacklinkResolver): Decorat
 						line.from,
 						line.from,
 						Decoration.widget({
-							widget: new AnchorWidget(sources, info.app, line.number - 1),
+							widget: new AnchorWidget(sources, info.app, line.number - 1, resolver),
 							side: -1,
 						}),
 					);

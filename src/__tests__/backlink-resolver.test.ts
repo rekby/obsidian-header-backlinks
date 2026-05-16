@@ -2,40 +2,34 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { App } from "obsidian";
 import { BacklinkResolver } from "../backlink-resolver";
 
-// Mock obsidian module
 vi.mock("obsidian", () => ({
 	App: class {},
 	TFile: class {},
 }));
 
-function createMockApp(
-	files: Array<{
-		path: string;
-		basename: string;
-		extension: string;
-		content: string;
-		cache: {
-			links?: Array<{
-				link: string;
-				original: string;
-				displayText: string;
-				position: {
-					start: { line: number; col: number; offset: number };
-					end: { line: number; col: number; offset: number };
-				};
-			}>;
-			embeds?: Array<{
-				link: string;
-				original: string;
-				displayText: string;
-				position: {
-					start: { line: number; col: number; offset: number };
-					end: { line: number; col: number; offset: number };
-				};
-			}>;
-		};
-	}>,
-) {
+interface MockRef {
+	link: string;
+	original: string;
+	displayText: string;
+	position: {
+		start: { line: number; col: number; offset: number };
+		end: { line: number; col: number; offset: number };
+	};
+}
+
+interface MockFile {
+	path: string;
+	basename: string;
+	extension: string;
+	content: string;
+	cache: {
+		links?: MockRef[];
+		embeds?: MockRef[];
+	};
+	links?: string[]; // resolved target paths for resolvedLinks
+}
+
+function createMockApp(files: MockFile[]) {
 	const fileObjects = files.map((f) => ({
 		path: f.path,
 		basename: f.basename,
@@ -46,14 +40,38 @@ function createMockApp(
 	const contentMap = new Map(files.map((f) => [f.path, f.content]));
 	const fileMap = new Map(fileObjects.map((f) => [f.path, f]));
 
+	const resolvedLinks: Record<string, Record<string, number>> = {};
+	for (const file of files) {
+		const targets: Record<string, number> = {};
+		const refs = [...(file.cache.links ?? []), ...(file.cache.embeds ?? [])];
+		for (const ref of refs) {
+			const hashIndex = ref.link.indexOf("#");
+			const linkpath = hashIndex === -1 ? ref.link : ref.link.substring(0, hashIndex);
+			const targetPath = linkpath === ""
+				? file.path
+				: fileMap.has(linkpath + ".md")
+					? linkpath + ".md"
+					: fileMap.has(linkpath)
+						? linkpath
+						: null;
+			if (targetPath) {
+				targets[targetPath] = (targets[targetPath] ?? 0) + 1;
+			}
+		}
+		if (Object.keys(targets).length > 0) {
+			resolvedLinks[file.path] = targets;
+		}
+	}
+
 	return {
 		vault: {
-			getMarkdownFiles: () => fileObjects,
+			getFileByPath: (path: string) => fileMap.get(path) ?? null,
 			cachedRead: (file: { path: string }) =>
 				Promise.resolve(contentMap.get(file.path) ?? ""),
 		},
 		metadataCache: {
-			getFileCache: (file: { path: string }) => cacheMap.get(file.path) ?? null,
+			resolvedLinks,
+			getCache: (path: string) => cacheMap.get(path) ?? null,
 			getFirstLinkpathDest: (linkpath: string, _sourcePath: string) =>
 				fileMap.get(linkpath + ".md") ?? fileMap.get(linkpath) ?? null,
 		},
@@ -67,7 +85,7 @@ describe("BacklinkResolver", () => {
 		onChanged = vi.fn();
 	});
 
-	it("finds backlinks with header fragments", async () => {
+	it("finds backlinks with header fragments", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -98,16 +116,16 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "My Header");
 		expect(sources).toHaveLength(1);
 		expect(sources[0]!.sourceFilePath).toBe("source.md");
 		expect(sources[0]!.sourceFileName).toBe("source");
 		expect(sources[0]!.lineNumber).toBe(0);
+		expect(sources[0]!.previewText).toBe(""); // lazy
 	});
 
-	it("normalizes header text for matching", async () => {
+	it("normalizes header text for matching", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -138,14 +156,12 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
-		// Should match even though case and spacing differ
 		const sources = resolver.getBacklinksForHeader("target.md", "My Header");
 		expect(sources).toHaveLength(1);
 	});
 
-	it("handles self-references (empty linkpath)", async () => {
+	it("handles self-references (empty linkpath)", () => {
 		const app = createMockApp([
 			{
 				path: "note.md",
@@ -169,14 +185,13 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("note.md", "Intro");
 		expect(sources).toHaveLength(1);
 		expect(sources[0]!.sourceFilePath).toBe("note.md");
 	});
 
-	it("handles embeds with header fragments", async () => {
+	it("handles embeds with header fragments", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -207,13 +222,12 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Section");
 		expect(sources).toHaveLength(1);
 	});
 
-	it("ignores links without header fragment", async () => {
+	it("ignores links without header fragment", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -244,13 +258,12 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Title");
 		expect(sources).toHaveLength(0);
 	});
 
-	it("ignores links with # but empty fragment", async () => {
+	it("ignores links with # but empty fragment", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -281,7 +294,6 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Title");
 		expect(sources).toHaveLength(0);
@@ -293,7 +305,7 @@ describe("BacklinkResolver", () => {
 		expect(resolver.getBacklinksForHeader("nonexistent.md", "Header")).toEqual([]);
 	});
 
-	it("returns empty array for unknown header", async () => {
+	it("returns empty array for unknown header", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -324,12 +336,11 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		expect(resolver.getBacklinksForHeader("target.md", "Nonexistent Header")).toEqual([]);
 	});
 
-	it("collects multiple backlinks to the same header", async () => {
+	it("collects multiple backlinks to the same header", () => {
 		const app = createMockApp([
 			{
 				path: "target.md",
@@ -379,7 +390,6 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
 		const sources = resolver.getBacklinksForHeader("target.md", "Header");
 		expect(sources).toHaveLength(2);
@@ -387,19 +397,64 @@ describe("BacklinkResolver", () => {
 		expect(paths).toEqual(["a.md", "b.md"]);
 	});
 
-	it("increments version on each build", async () => {
+	it("increments version and notifies onChanged on invalidate", () => {
 		const app = createMockApp([]);
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
 		expect(resolver.getVersion()).toBe(0);
 
-		await resolver.buildMap();
+		resolver.invalidate();
 		expect(resolver.getVersion()).toBe(1);
+		expect(onChanged).toHaveBeenCalledTimes(1);
 
-		await resolver.buildMap();
+		resolver.invalidate();
 		expect(resolver.getVersion()).toBe(2);
+		expect(onChanged).toHaveBeenCalledTimes(2);
 	});
 
-	it("ignores links to non-existent target files", async () => {
+	it("invalidate clears cached file maps", () => {
+		const files: MockFile[] = [
+			{
+				path: "target.md",
+				basename: "target",
+				extension: "md",
+				content: "",
+				cache: {},
+			},
+			{
+				path: "source.md",
+				basename: "source",
+				extension: "md",
+				content: "",
+				cache: {
+					links: [
+						{
+							link: "target#H",
+							original: "[[target#H]]",
+							displayText: "target#H",
+							position: {
+								start: { line: 0, col: 0, offset: 0 },
+								end: { line: 0, col: 12, offset: 12 },
+							},
+						},
+					],
+				},
+			},
+		];
+		const app = createMockApp(files);
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
+
+		expect(resolver.getBacklinksForHeader("target.md", "H")).toHaveLength(1);
+
+		// Mutate resolvedLinks "in place" to simulate that the cache hides stale data
+		app.metadataCache.resolvedLinks = {};
+		// Without invalidate, the cached file map still returns the old result
+		expect(resolver.getBacklinksForHeader("target.md", "H")).toHaveLength(1);
+
+		resolver.invalidate();
+		expect(resolver.getBacklinksForHeader("target.md", "H")).toHaveLength(0);
+	});
+
+	it("ignores links to non-existent target files", () => {
 		const app = createMockApp([
 			{
 				path: "source.md",
@@ -423,31 +478,91 @@ describe("BacklinkResolver", () => {
 		]);
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
 
-		// No target file exists, so no backlinks should be found
 		expect(resolver.getBacklinksForHeader("nonexistent.md", "Header")).toEqual([]);
 	});
 
-	it("skips files without metadata cache", async () => {
-		const fileObjects = [
-			{ path: "nocache.md", basename: "nocache", extension: "md" },
-		];
-
+	it("skips source files without metadata cache", () => {
+		// resolvedLinks contains an entry but getCache returns null for it
 		const app = {
 			vault: {
-				getMarkdownFiles: () => fileObjects,
+				getFileByPath: () => null,
 				cachedRead: () => Promise.resolve(""),
 			},
 			metadataCache: {
-				getFileCache: () => null,
+				resolvedLinks: { "nocache.md": { "target.md": 1 } },
+				getCache: () => null,
 				getFirstLinkpathDest: () => null,
 			},
 		};
 
 		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
-		await resolver.buildMap();
-		// Should not throw and map should be empty
-		expect(resolver.getVersion()).toBe(1);
+		expect(resolver.getBacklinksForHeader("target.md", "Anything")).toEqual([]);
+	});
+
+	it("loadPreviews fills previewText for matching ref positions", async () => {
+		const app = createMockApp([
+			{
+				path: "target.md",
+				basename: "target",
+				extension: "md",
+				content: "# Header\n",
+				cache: {},
+			},
+			{
+				path: "source.md",
+				basename: "source",
+				extension: "md",
+				content: "See [[target#Header]] for context here",
+				cache: {
+					links: [
+						{
+							link: "target#Header",
+							original: "[[target#Header]]",
+							displayText: "target#Header",
+							position: {
+								start: { line: 0, col: 4, offset: 4 },
+								end: { line: 0, col: 21, offset: 21 },
+							},
+						},
+					],
+				},
+			},
+		]);
+
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
+		const sources = resolver.getBacklinksForHeader("target.md", "Header");
+		expect(sources[0]!.previewText).toBe("");
+
+		await resolver.loadPreviews(sources);
+		expect(sources[0]!.previewText.length).toBeGreaterThan(0);
+		expect(sources[0]!.previewText).toContain("[[target#Header]]");
+	});
+
+	it("loadPreviews skips sources whose source file is missing", async () => {
+		const sources = [
+			{
+				sourceFilePath: "missing.md",
+				sourceFileName: "missing",
+				lineNumber: 0,
+				columnNumber: 0,
+				previewText: "",
+			},
+		];
+		const app = {
+			vault: {
+				getFileByPath: () => null,
+				cachedRead: () => Promise.resolve(""),
+			},
+			metadataCache: {
+				resolvedLinks: {},
+				getCache: () => null,
+				getFirstLinkpathDest: () => null,
+			},
+		};
+
+		const resolver = new BacklinkResolver(app as unknown as App, onChanged);
+		await resolver.loadPreviews(sources);
+		expect(sources[0]!.previewText).toBe("");
 	});
 });

@@ -13,14 +13,10 @@ export default class HandleHeaderLinkPlugin extends Plugin {
 
 		this.registerEditorExtension(createEditorExtension(this.resolver));
 
-		this.app.workspace.onLayoutReady(() => {
-			void this.resolver.rebuildNow();
-		});
-
-		const scheduleBuild = () => { this.resolver.scheduleBuild(); };
-		this.registerEvent(this.app.metadataCache.on("changed", scheduleBuild));
-		this.registerEvent(this.app.metadataCache.on("deleted", scheduleBuild));
-		this.registerEvent(this.app.metadataCache.on("resolved", scheduleBuild));
+		const scheduleInvalidate = () => { this.resolver.scheduleInvalidate(); };
+		this.registerEvent(this.app.metadataCache.on("changed", scheduleInvalidate));
+		this.registerEvent(this.app.metadataCache.on("deleted", scheduleInvalidate));
+		this.registerEvent(this.app.metadataCache.on("resolved", scheduleInvalidate));
 	}
 
 	onunload() {

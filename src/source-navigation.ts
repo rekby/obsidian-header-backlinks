@@ -27,12 +27,20 @@ export class BacklinkOccurrencesModal extends SuggestModal<HeaderBacklinkSource>
 	private readonly fileName: string;
 	private readonly onChoose: (source: HeaderBacklinkSource) => void;
 	private readonly sources: HeaderBacklinkSource[];
+	private readonly loadPreviews?: (sources: HeaderBacklinkSource[]) => Promise<void>;
 
-	constructor(app: App, fileName: string, sources: HeaderBacklinkSource[], onChoose: (source: HeaderBacklinkSource) => void) {
+	constructor(
+		app: App,
+		fileName: string,
+		sources: HeaderBacklinkSource[],
+		onChoose: (source: HeaderBacklinkSource) => void,
+		loadPreviews?: (sources: HeaderBacklinkSource[]) => Promise<void>,
+	) {
 		super(app);
 		this.fileName = fileName;
 		this.sources = sources;
 		this.onChoose = onChoose;
+		this.loadPreviews = loadPreviews;
 		this.emptyStateText = "No links found";
 	}
 
@@ -62,6 +70,11 @@ export class BacklinkOccurrencesModal extends SuggestModal<HeaderBacklinkSource>
 			{ command: "Enter", purpose: "Jump to link" },
 			{ command: "Esc", purpose: "Close" },
 		]);
+		if (this.loadPreviews) {
+			void this.loadPreviews(this.sources).then(() => {
+				this.inputEl.dispatchEvent(new Event("input"));
+			});
+		}
 	}
 }
 

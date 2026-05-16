@@ -5,6 +5,3 @@ export interface HeaderBacklinkSource {
 	columnNumber: number;
 	previewText: string;
 }
-
-/** filePath -> normalizedHeader -> sources[] */
-export type HeaderBacklinksMap = Map<string, Map<string, HeaderBacklinkSource[]>>;
