@@ -63,10 +63,10 @@ class AnchorWidget extends WidgetType {
 	}
 
 	toDOM(): HTMLElement {
-		const wrapper = document.createElement("span");
+		const wrapper = activeDocument.createElement("span");
 		wrapper.className = "header-backlink-anchor-wrapper";
 
-		const el = document.createElement("span");
+		const el = activeDocument.createElement("span");
 		el.className = "header-backlink-anchor";
 		el.setAttribute("aria-label", `${this.sources.length} backlink(s)`);
 		setIcon(el, "anchor");

@@ -10,7 +10,7 @@ export function normalizeHeader(text: string): string {
 
 export class BacklinkResolver {
 	private map: HeaderBacklinksMap = new Map();
-	private rebuildTimeout: ReturnType<typeof setTimeout> | null = null;
+	private rebuildTimeout: number | null = null;
 	private rebuildSequence: Promise<void> = Promise.resolve();
 	private version = 0;
 	private onChanged: (() => void) | null = null;
@@ -69,9 +69,9 @@ export class BacklinkResolver {
 
 	scheduleBuild(): void {
 		if (this.rebuildTimeout !== null) {
-			clearTimeout(this.rebuildTimeout);
+			window.clearTimeout(this.rebuildTimeout);
 		}
-		this.rebuildTimeout = setTimeout(() => {
+		this.rebuildTimeout = window.setTimeout(() => {
 			this.rebuildTimeout = null;
 			void this.rebuildNow();
 		}, DEBOUNCE_MS);
@@ -79,7 +79,7 @@ export class BacklinkResolver {
 
 	destroy(): void {
 		if (this.rebuildTimeout !== null) {
-			clearTimeout(this.rebuildTimeout);
+			window.clearTimeout(this.rebuildTimeout);
 			this.rebuildTimeout = null;
 		}
 		this.onChanged = null;

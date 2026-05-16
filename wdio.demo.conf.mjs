@@ -2,8 +2,8 @@ import path from "node:path";
 import process from "node:process";
 
 const cacheDir = path.resolve(".obsidian-cache");
-const obsidianVersion = process.env.OBSIDIAN_TEST_VERSION ?? "latest";
-const installerVersion = process.env.OBSIDIAN_INSTALLER_VERSION ?? "latest";
+const obsidianVersion = process.env.OBSIDIAN_TEST_VERSION ?? "earliest";
+const installerVersion = process.env.OBSIDIAN_INSTALLER_VERSION ?? "earliest";
 
 export const config = {
 	runner: "local",
