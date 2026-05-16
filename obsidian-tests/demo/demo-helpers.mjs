@@ -2,8 +2,33 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import { $, $$, browser } from "@wdio/globals";
 import { obsidianPage } from "wdio-obsidian-service";
+
+const FONTSOURCE_INTER_DIR = path.resolve("node_modules/@fontsource/inter");
+const DEMO_FONT_WEIGHTS = ["400", "500", "600", "700"];
+let cachedFontCss = null;
+
+/**
+ * Read the bundled Inter CSS (one file per weight) from @fontsource and rewrite
+ * its relative `url(./files/foo.woff2)` references to absolute `file://` URLs
+ * so Electron can load them from disk. Bundling a font means screenshots no
+ * longer depend on the system font installed on the developer's machine.
+ */
+async function loadInterFontCss() {
+	if (cachedFontCss !== null) return cachedFontCss;
+	const filesDir = path.join(FONTSOURCE_INTER_DIR, "files");
+	const blocks = [];
+	for (const weight of DEMO_FONT_WEIGHTS) {
+		const css = await fs.readFile(path.join(FONTSOURCE_INTER_DIR, `${weight}.css`), "utf8");
+		blocks.push(css.replace(/url\(\.\/files\/([^)]+)\)/g, (_, file) => {
+			return `url('${pathToFileURL(path.join(filesDir, file)).href}')`;
+		}));
+	}
+	cachedFontCss = blocks.join("\n");
+	return cachedFontCss;
+}
 
 /**
  * Debug hypotheses (session 7e7b4f):
@@ -43,6 +68,18 @@ export const DEMO_ARTIFACTS_ROOT_RU = path.join(DEMO_ARTIFACTS_ROOT, "ru");
 export const HUMAN_PAUSE_MS = 800;
 
 export const APP_SELECTOR = ".app-container";
+
+/** Target inner viewport for deterministic demo screenshots. Same size used for PNGs and GIFs. */
+export const DEMO_VIEWPORT_WIDTH = 800;
+export const DEMO_VIEWPORT_HEIGHT = 600;
+/** Fixed width of the left sidebar (file explorer) so its layout is stable. */
+const LEFT_SPLIT_WIDTH = 200;
+/**
+ * Stable display name for the vault in screenshots/GIFs. The service copies
+ * the source vault to a temp dir with a random suffix (e.g. `demo-vault-0CQYIH`),
+ * so the original `app.vault.getName()` is not deterministic across runs.
+ */
+export const STABLE_VAULT_NAME = "plugin-demo-vault";
 
 /** Matches demo vault links to `Project roadmap.md` headings (same as plugin backlink map). */
 const DEMO_BACKLINKS_BY_HEADER = {
@@ -102,6 +139,8 @@ export class DemoRecorder {
 	async capture(durationMs, selector = APP_SELECTOR) {
 		const target = await $(selector);
 		await target.waitForDisplayed();
+
+		await prepareForScreenshot();
 
 		const filename = `${String(this.frameIndex).padStart(4, "0")}.png`;
 		const filepath = path.join(this.scenarioDir, filename);
@@ -172,7 +211,7 @@ export async function waitForBacklinksReady() {
 	);
 }
 
-export async function prepareDemoScenario({ vault, startFile, locale = "en" }) {
+export async function prepareDemoScenario({ vault, startFile, locale = "en", stableVaultName = STABLE_VAULT_NAME }) {
 	await browser.keys("Escape");
 	const modalContainer = await $(".modal-container");
 	if (await modalContainer.isDisplayed().catch(() => false)) {
@@ -241,12 +280,43 @@ export async function prepareDemoScenario({ vault, startFile, locale = "en" }) {
 	}
 
 	await waitForPlugin();
-	await configureDemoEnvironment(locale);
+	await configureDemoEnvironment(locale, stableVaultName);
 	await obsidianPage.openFile(startFile);
 	await waitForBacklinksReady();
+	await normalizeEditorState();
 }
 
-export async function configureDemoEnvironment(locale = "en") {
+/**
+ * Put the active editor into a known state: cursor at the start of the file,
+ * no selection, scrolled to the top. Without this the cursor lands wherever
+ * Obsidian last left it, which varies between runs.
+ */
+async function normalizeEditorState() {
+	await browser.executeObsidian(({ app, obsidian }) => {
+		const view = app.workspace.getActiveViewOfType?.(obsidian.MarkdownView);
+		if (!view) return;
+		const editor = view.editor;
+		const start = { line: 0, ch: 0 };
+		editor.setSelection(start, start);
+		editor.scrollTo(0, 0);
+		if (typeof view.contentEl?.scrollTo === "function") {
+			view.contentEl.scrollTo(0, 0);
+		}
+		const scrollers = view.containerEl?.querySelectorAll?.(".cm-scroller, .markdown-preview-view") ?? [];
+		scrollers.forEach((el) => {
+			el.scrollTop = 0;
+			el.scrollLeft = 0;
+		});
+	});
+	await browser.execute(() => {
+		const active = document.activeElement;
+		if (active && typeof active.blur === "function" && active !== document.body) {
+			active.blur();
+		}
+	});
+}
+
+export async function configureDemoEnvironment(locale = "en", stableVaultName = null) {
 	const needsReload = await browser.execute((lang) => {
 		const current = window.localStorage.getItem("language");
 		if (current === lang) return false;
@@ -262,13 +332,19 @@ export async function configureDemoEnvironment(locale = "en") {
 		await waitForPlugin();
 	}
 
-	await browser.execute(() => {
+	const interFontCss = await loadInterFontCss();
+
+	await browser.execute((leftWidth, frameW, frameH, fontCss) => {
 		const styleId = "header-backlinks-demo-style";
 		document.getElementById(styleId)?.remove();
 
 		const style = document.createElement("style");
 		style.id = styleId;
 		style.textContent = `
+			${fontCss}
+			body, body * {
+				font-family: 'Inter', sans-serif !important;
+			}
 			body.theme-dark {
 				color-scheme: light;
 			}
@@ -281,23 +357,188 @@ export async function configureDemoEnvironment(locale = "en") {
 			.workspace-tab-header-container {
 				display: none !important;
 			}
+			.workspace-split.mod-left-split {
+				width: ${leftWidth}px !important;
+				min-width: ${leftWidth}px !important;
+				max-width: ${leftWidth}px !important;
+				flex: 0 0 ${leftWidth}px !important;
+			}
+			/*
+			 * Belt-and-braces: pin .app-container to exactly the screenshot frame.
+			 * The Electron window itself is also resized to this size (see
+			 * lockElectronWindow) so popovers/menus stay inside the frame.
+			 */
+			.app-container {
+				width: ${frameW}px !important;
+				height: ${frameH}px !important;
+				overflow: hidden !important;
+			}
+			*, *::before, *::after {
+				animation-duration: 0ms !important;
+				animation-delay: 0ms !important;
+				transition-duration: 0ms !important;
+				transition-delay: 0ms !important;
+				scroll-behavior: auto !important;
+			}
+			.cm-cursor, .cm-cursorLayer, .cm-fat-cursor {
+				visibility: hidden !important;
+				opacity: 0 !important;
+			}
+			.cm-content,
+			input, textarea, [contenteditable="true"] {
+				caret-color: transparent !important;
+			}
+			.cm-selectionBackground,
+			::selection,
+			::-moz-selection {
+				background: transparent !important;
+			}
 		`;
 		document.head.append(style);
 
 		document.body.classList.remove("theme-dark");
 		document.body.classList.add("theme-light");
 		window.dispatchEvent(new Event("resize"));
+	}, LEFT_SPLIT_WIDTH, DEMO_VIEWPORT_WIDTH, DEMO_VIEWPORT_HEIGHT, interFontCss);
+
+	await browser.execute(async () => {
+		if (document.fonts && typeof document.fonts.ready?.then === "function") {
+			await document.fonts.ready;
+		}
 	});
 
-	await browser.executeObsidian(({ app }) => {
-		app.workspace.leftSplit?.expand?.();
+	await browser.executeObsidian(({ app }, leftWidth) => {
+		const left = app.workspace.leftSplit;
+		left?.expand?.();
+		if (left && typeof left.setSize === "function") {
+			left.setSize(leftWidth);
+		}
+	}, LEFT_SPLIT_WIDTH);
+
+	if (stableVaultName) {
+		await stabilizeVaultName(stableVaultName);
+	}
+
+	await lockElectronWindow(DEMO_VIEWPORT_WIDTH, DEMO_VIEWPORT_HEIGHT);
+	await assertFrameSize(DEMO_VIEWPORT_WIDTH, DEMO_VIEWPORT_HEIGHT);
+}
+
+/**
+ * Resize the actual Electron BrowserWindow so the inner viewport matches the
+ * screenshot frame. Without this, popovers/menus position themselves in the
+ * full Electron viewport — which is larger than `.app-container` — and end up
+ * outside the screenshot region.
+ *
+ * Tries the Electron-native API first (Obsidian's renderer has node integration),
+ * then falls back to `window.resizeTo`. Chromedriver classic does not support
+ * WebDriver's window/rect for Electron windows.
+ */
+async function lockElectronWindow(innerWidth, innerHeight) {
+	await browser.execute((targetW, targetH) => {
+		let win = null;
+		try {
+			const electron = window.require?.("electron");
+			win = electron?.remote?.getCurrentWindow?.()
+				?? electron?.BrowserWindow?.getFocusedWindow?.()
+				?? null;
+		} catch {
+			win = null;
+		}
+
+		if (win && typeof win.setContentSize === "function") {
+			win.setResizable?.(true);
+			win.setContentSize(targetW, targetH);
+			return;
+		}
+		if (win && typeof win.setSize === "function") {
+			const chromeW = window.outerWidth - window.innerWidth;
+			const chromeH = window.outerHeight - window.innerHeight;
+			win.setResizable?.(true);
+			win.setSize(targetW + chromeW, targetH + chromeH);
+			return;
+		}
+
+		window.resizeTo(targetW, targetH);
+		const chromeW = window.outerWidth - window.innerWidth;
+		const chromeH = window.outerHeight - window.innerHeight;
+		if (chromeW !== 0 || chromeH !== 0) {
+			window.resizeTo(targetW + chromeW, targetH + chromeH);
+		}
+	}, innerWidth, innerHeight);
+
+	const final = await browser.execute(() => ({
+		iw: window.innerWidth,
+		ih: window.innerHeight,
+	}));
+	assert.equal(final.iw, innerWidth, `viewport innerWidth ${final.iw} != ${innerWidth}`);
+	assert.equal(final.ih, innerHeight, `viewport innerHeight ${final.ih} != ${innerHeight}`);
+}
+
+const VAULT_NAME_SELECTORS = [
+	".workspace-drawer-vault-name",
+	".nav-folder.mod-root > .nav-folder-title .nav-folder-title-content",
+].join(", ");
+
+/**
+ * Replace every on-screen rendering of the vault name with a stable string.
+ * The service copies the vault to a temp dir suffixed with a random hash
+ * (e.g. `demo-vault-0CQYIH`) — that name appears in (a) the vault-switcher at
+ * the bottom of the file explorer and (b) the root folder header at the top.
+ *
+ * We patch `app.vault.getName` so future re-renders use the stable name, then
+ * overwrite both DOM locations in case Obsidian already rendered the originals.
+ */
+async function stabilizeVaultName(name) {
+	await browser.executeObsidian(({ app }, payload) => {
+		const vault = app.vault;
+		if (!vault.__demoOriginalGetName) {
+			vault.__demoOriginalGetName = vault.getName.bind(vault);
+		}
+		vault.getName = () => payload.name;
+		document.querySelectorAll(payload.selectors).forEach((el) => {
+			el.textContent = payload.name;
+		});
+	}, { name, selectors: VAULT_NAME_SELECTORS });
+}
+
+async function assertFrameSize(expectedWidth, expectedHeight) {
+	const actual = await browser.execute(() => {
+		const el = document.querySelector(".app-container");
+		if (!el) return null;
+		const r = el.getBoundingClientRect();
+		return { width: Math.round(r.width), height: Math.round(r.height) };
 	});
+	assert.ok(actual, ".app-container not found");
+	assert.equal(actual.width, expectedWidth, `.app-container width ${actual.width} != ${expectedWidth}`);
+	assert.equal(actual.height, expectedHeight, `.app-container height ${actual.height} != ${expectedHeight}`);
+}
+
+/**
+ * Quiet the page just before a screenshot: drop focus (avoids caret/selection
+ * artefacts), wait for webfonts to finish loading, then flush two paint frames.
+ */
+export async function prepareForScreenshot() {
+	await browser.executeObsidian(async ({ app }, selectors) => {
+		const active = document.activeElement;
+		if (active && typeof active.blur === "function" && active !== document.body) {
+			active.blur();
+		}
+		const stableName = app.vault.getName();
+		document.querySelectorAll(selectors).forEach((el) => {
+			if (el.textContent !== stableName) el.textContent = stableName;
+		});
+		if (document.fonts && typeof document.fonts.ready?.then === "function") {
+			await document.fonts.ready;
+		}
+		await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+	}, VAULT_NAME_SELECTORS);
 }
 
 export async function saveAppScreenshot(outputPath) {
 	await fs.mkdir(path.dirname(outputPath), { recursive: true });
 	const app = await $(APP_SELECTOR);
 	await app.waitForDisplayed();
+	await prepareForScreenshot();
 	await app.saveScreenshot(outputPath);
 }
 
