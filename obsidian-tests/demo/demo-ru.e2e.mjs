@@ -10,6 +10,8 @@ import {
 	openBacklinkMenuForDemo,
 	clickMenuItem,
 	captureKeyPress,
+	hideKeyPressOverlay,
+	highlightMenuItem,
 	waitForActiveFile,
 	dismissOpenUi,
 	debugLog,
@@ -50,8 +52,11 @@ describe("Header Backlinks demo capture (Russian)", function () {
 
 		await recorder.captureAndPause(HUMAN_PAUSE_MS);
 
-		await captureKeyPress(recorder, "Выбрать заметку", 600);
+		await captureKeyPress(recorder, "Выбрать заметку", 600, { keepVisible: true });
+		await highlightMenuItem("Протоколы встреч");
+		await recorder.captureAndPause(600);
 		await clickMenuItem("Протоколы встреч");
+		await hideKeyPressOverlay();
 		await browser.pause(500);
 
 		await waitForActiveFile("Протоколы встреч.md");

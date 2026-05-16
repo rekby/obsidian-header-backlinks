@@ -729,7 +729,29 @@ export async function clickMenuItem(text) {
 	throw new Error(`Menu item "${text}" not found`);
 }
 
-export async function captureKeyPress(recorder, label, durationMs = 650) {
+/**
+ * Add Obsidian's `selected` class to the menu item whose visible text contains
+ * `text`, mimicking the keyboard-navigation/hover highlight. Used in demos to
+ * make it obvious which item the next click will target. Clears the highlight
+ * from any previously-highlighted menu items first.
+ */
+export async function highlightMenuItem(text) {
+	const found = await browser.execute((target) => {
+		const items = document.querySelectorAll(".menu .menu-item, .popover .menu-item");
+		items.forEach((el) => el.classList.remove("selected"));
+		for (const item of items) {
+			if ((item.textContent ?? "").includes(target)) {
+				item.classList.add("selected");
+				return true;
+			}
+		}
+		return false;
+	}, text);
+	assert.ok(found, `Menu item "${text}" not found for highlight`);
+}
+
+export async function captureKeyPress(recorder, label, durationMs = 650, options = {}) {
+	const { keepVisible = false } = options;
 	await browser.execute((text) => {
 		let overlay = document.getElementById("header-backlinks-demo-key-overlay");
 		if (!overlay) {
@@ -754,6 +776,12 @@ export async function captureKeyPress(recorder, label, durationMs = 650) {
 		overlay.style.display = "block";
 	}, label);
 	await recorder.captureAndPause(durationMs);
+	if (!keepVisible) {
+		await hideKeyPressOverlay();
+	}
+}
+
+export async function hideKeyPressOverlay() {
 	await browser.execute(() => {
 		const overlay = document.getElementById("header-backlinks-demo-key-overlay");
 		if (!overlay) return;

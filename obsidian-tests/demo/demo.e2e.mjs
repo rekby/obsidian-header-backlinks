@@ -8,6 +8,8 @@ import {
 	openBacklinkMenuForDemo,
 	clickMenuItem,
 	captureKeyPress,
+	hideKeyPressOverlay,
+	highlightMenuItem,
 	waitForActiveFile,
 	dismissOpenUi,
 	debugLog,
@@ -45,8 +47,11 @@ describe("Header Backlinks demo capture", function () {
 
 		await recorder.captureAndPause(HUMAN_PAUSE_MS);
 
-		await captureKeyPress(recorder, "Select note", 600);
+		await captureKeyPress(recorder, "Select note", 600, { keepVisible: true });
+		await highlightMenuItem("Meeting notes");
+		await recorder.captureAndPause(600);
 		await clickMenuItem("Meeting notes");
+		await hideKeyPressOverlay();
 		await browser.pause(500);
 
 		await waitForActiveFile("Meeting notes.md");
